@@ -78,12 +78,6 @@ const projectSchema = new Schema({
             }
         }
     ],
-    progress: {
-        type: Number,   // percentage of milestones completed
-        default: 0,
-        min: 0,
-        max: 100
-    },
     status: {
         type: String,
         enum: ['draft', 'active', 'completed', 'cancelled'],
@@ -95,7 +89,8 @@ const projectSchema = new Schema({
     },
 }, { timestamps: true });
 
-projectSchema.index({ title: 'text', tags: 'text', location: 'text', createdAt: -1 });
+projectSchema.index({ title: 'text', tags: 'text', location: 'text' });
+projectSchema.index({ createdAt: -1 }); // for sorting by creation date
 
 projectSchema.virtual('progress').get( function() {
     if (!this.milestones || this.milestones.length === 0) return 0;

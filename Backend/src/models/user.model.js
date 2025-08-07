@@ -1,4 +1,5 @@
 import mongoose, { Schema } from "mongoose";
+import bcrypt from "bcrypt";
 
 const userSchema = new mongoose.Schema({
     username: {
@@ -8,7 +9,6 @@ const userSchema = new mongoose.Schema({
         lowercase: true,
         trim: true,
         minlength: 3,
-        index: true
     },
     email: {
         type: String,
@@ -100,5 +100,30 @@ const userSchema = new mongoose.Schema({
         type: String
     }
 }, { timestamps: true });
+
+
+userSchema.index({ username: 'text', fullname: 'text', interests: 'text', location: 'text' });
+
+userSchema.pre('save', async function (next) {
+    if (this.isModified('password')) {
+        const salt = await bcrypt.genSalt(10);
+        this.password = await bcrypt.hash(this.password, salt);
+    }
+    if (this.isModified('username')) {
+        this.username = this.username.toLowerCase();
+    }
+    if (this.isModified('fullname')) {
+        this.fullname = this.fullname.toLowerCase();
+    }
+    if (this.isModified('email')) {
+        this.email = this.email.toLowerCase();
+    }
+    next();
+})
+
+userSchema.methods.comparePassword = async function (candidatePassword) {
+    return await bcrypt.compare(candidatePassword, this.password);
+}
+
 
 export const User = mongoose.model("User", userSchema);
