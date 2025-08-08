@@ -87,6 +87,17 @@ const projectSchema = new Schema({
     endDate: {
         type: Date,
     },
+    lastMessage: {
+        text: String,
+        sender: {
+            type: Schema.Types.ObjectId,
+            ref: 'User'
+        },
+        sentAt: {
+            type: Date,
+            default: Date.now
+        }
+    }
 }, { timestamps: true });
 
 projectSchema.index({ title: 'text', tags: 'text', location: 'text' });
