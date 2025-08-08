@@ -42,12 +42,14 @@ const userSchema = new mongoose.Schema({
     interests: [
         {
             type: String,
+            enum: ['environment', 'education', 'health', 'community', 'technology', 'other'],
             lowercase: true,
             trim: true
         }
     ],
     isVerified: {
-        type: Boolean
+        type: Boolean,
+        default: false
     },
     trustScore: {
         type: Number,
