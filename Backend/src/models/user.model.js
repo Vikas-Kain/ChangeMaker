@@ -1,5 +1,6 @@
 import mongoose, { Schema } from "mongoose";
 import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 
 const userSchema = new mongoose.Schema({
     username: {
@@ -77,24 +78,6 @@ const userSchema = new mongoose.Schema({
             index: "2dsphere"  // for geospatial queries
         }
     },
-    history: [
-        {
-            type: Schema.Types.ObjectId,
-            ref: "Project"
-        }
-    ],
-    projects: [
-        {
-            type: Schema.Types.ObjectId,
-            ref: "Project"
-        }
-    ],
-    posts: [
-        {
-            type: Schema.Types.ObjectId,
-            ref: "Post"
-        }
-    ],
     refreshToken: {
         type: String
     }
@@ -122,6 +105,33 @@ userSchema.pre('save', async function (next) {
 
 userSchema.methods.comparePassword = async function (candidatePassword) {
     return await bcrypt.compare(candidatePassword, this.password);
+}
+
+userSchema.methods.generateAccessToken = async function () {
+    return jwt.sign(
+        {
+            _id: this._id,
+            username: this.username,
+            email: this.email,
+            fullname: this.fullname
+        },
+        process.env.ACCESS_TOKEN_SECRET,
+        {
+            expiresIn: process.env.ACCESS_TOKEN_EXPIRY
+        }
+    )
+}
+
+userSchema.methods.generateRefreshToken = async function () {
+    return jwt.sign(
+        {
+            _id: this._id
+        },
+        process.env.REFRESH_TOKEN_SECRET,
+        {
+            expiresIn: process.env.REFRESH_TOKEN_EXPIRY
+        }
+    )
 }
 
 
