@@ -1,6 +1,6 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { User } from "../models/user.model.js";
-import { ApiError } from "../utils/apiError.js";
+import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 import { uploadFileOnCloudinary } from "../utils/cloudinary.js";
 import { deleteFile } from "../utils/deleteFile.js";
@@ -96,6 +96,12 @@ const registerUser = asyncHandler(async (req, res) => {
             throw new ApiError(400, "Location coordinates must be an array of [lng, lat]");
         }
         locationCoordinates = locationCoordinates.map(coord => Number(coord));
+    }
+    if (
+        locationCoordinates[0] < -180 || locationCoordinates[0] > 180 ||
+        locationCoordinates[1] < -90 || locationCoordinates[1] > 90
+    ) {
+        throw new ApiError(400, "Invalid longitude/latitude values");
     }
     
     // validate email (regex, valid email)
@@ -218,6 +224,36 @@ const loginUser = asyncHandler(async (req, res) => {
         )
 });
 
+const logoutUser = asyncHandler(async (req, res) => {
+    const userId = req.user?._id;
+    if (!userId) {
+        throw new ApiError(401, "Unauthorized: No user found");
+    }
+
+    // clear refresh token in DB
+    await User.findByIdAndUpdate(
+        userId,
+        {
+            $unset: {
+                refreshToken: 1     // can also set refreshToken as null
+            }
+        }
+    );
+
+    const options = {
+        httpOnly: true,
+        secure: true
+    }
+
+    return res
+        .status(200)
+        .clearCookie("accessToken", options)
+        .clearCookie("refreshToken", options)
+        .json(
+            new ApiResponse(200, {}, "User logged out successfully")
+        )
+});
+
 export {
-    registerUser, loginUser
+    registerUser, loginUser, logoutUser
 };
