@@ -20,7 +20,27 @@ const cleanupFiles = async (...filePaths) => {
     }
 }
 
+const sanitizeUser = (user) => {
+    const sanitizedUser = user.toObject();
+    delete sanitizedUser.password;
+    delete sanitizedUser.refreshToken;
+    return sanitizedUser;
+}
 
+const generateAccessAndRefreshToken = async (user) => {
+    const accessToken = await user.generateAccessToken();
+    const refreshToken = await user.generateRefreshToken();
+    user.refreshToken = refreshToken;
+    
+    await user.save();  // save refresh token in DB
+    if (!accessToken || !refreshToken) {
+        throw new ApiError(500, "Failed to generate tokens");
+    }
+    return { accessToken, refreshToken };
+}
+
+
+// register user
 const registerUser = asyncHandler(async (req, res) => {
     // input text fields
     const { username, email, fullname, password, interests } = req.body
@@ -75,7 +95,7 @@ const registerUser = asyncHandler(async (req, res) => {
             await cleanupFiles(avatarLocalPath, coverImageLocalPath)
             throw new ApiError(400, "Location coordinates must be an array of [lng, lat]");
         }
-        locationCoordinates = locationCoordinates.map(coord => Number(coord.trim()));
+        locationCoordinates = locationCoordinates.map(coord => Number(coord));
     }
     
     // validate email (regex, valid email)
@@ -142,6 +162,62 @@ const registerUser = asyncHandler(async (req, res) => {
 
 });
 
+// login user
+const loginUser = asyncHandler(async (req, res) => {
+    // input text fields
+    const { userId, password } = req.body
+
+    // validate input fields
+    if (!userId || !password) {
+        throw new ApiError(400, "User ID and Password are required")
+    }
+
+    // check if userId is email or username
+    const isEmail = emailRegex.test(userId.trim());
+    const email = isEmail ? userId.trim() : null;
+    const username = isEmail ? null : userId.trim();
+
+    // check if user exists in DB
+    const user = await User.findOne({
+        $or: [
+            { email },
+            { username }
+        ]
+    });
+
+    if (!user) {
+        throw new ApiError(404, "User not found")
+    }
+
+    // check if password is correct
+    const isPasswordCorrect = await user.comparePassword(password)
+    if (!isPasswordCorrect) {
+        throw new ApiError(401, "Invalid Password")
+    }
+
+    // generate access and refresh token
+    const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user);
+
+    const options = {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production', // set secure flag in production
+    }
+
+    return res
+        .status(200)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", refreshToken, options)
+        .json(
+            new ApiResponse(
+                200,
+                {
+                    user: sanitizeUser(user), accessToken, refreshToken
+                },
+                "User Logged In Successfully"
+            )
+        )
+});
+
 export {
-    registerUser
+    registerUser, loginUser
 };
