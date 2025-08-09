@@ -76,8 +76,7 @@ const userSchema = new mongoose.Schema({
                     return value.length === 2;
                 },
                 message: 'Coordinates must be an array of [lng, lat]'
-            },
-            index: "2dsphere"  // for geospatial queries
+            }
         }
     },
     refreshToken: {
@@ -87,6 +86,8 @@ const userSchema = new mongoose.Schema({
 
 
 userSchema.index({ username: 'text', fullname: 'text', interests: 'text', location: 'text' });
+userSchema.index({ locationCoordinates: "2dsphere" });      // for geospatial queries
+
 
 userSchema.pre('save', async function (next) {
     if (this.isModified('password')) {

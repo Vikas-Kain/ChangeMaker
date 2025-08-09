@@ -20,13 +20,6 @@ const cleanupFiles = async (...filePaths) => {
     }
 }
 
-const validateLocationCoordinates = (coordinates) => {
-    if (!Array.isArray(coordinates) || coordinates.length !== 2) {
-        return false;
-    }
-    return coordinates.every(coord => typeof coord === 'number' && !isNaN(coord));
-}
-
 
 const registerUser = asyncHandler(async (req, res) => {
     // input text fields
@@ -38,6 +31,11 @@ const registerUser = asyncHandler(async (req, res) => {
 
     const avatarLocalPath = avatarFile?.path
     const coverImageLocalPath = coverImageFile?.path
+
+    if ( !avatarLocalPath ) {
+        await cleanupFiles(avatarLocalPath, coverImageLocalPath)
+        throw new ApiError(400, "Avatar is required")
+    }
 
     // validate input fields
     if ([username, email, fullname, password].some
@@ -72,12 +70,12 @@ const registerUser = asyncHandler(async (req, res) => {
     const location = req.body.location?.trim() || "";
     let locationCoordinates = req.body.locationCoordinates;
 
-    if (Array.isArray(locationCoordinates)) {
-        locationCoordinates = locationCoordinates.map(coord => Number(coord.strip()));
-    }
-    if ( locationCoordinates && !validateLocationCoordinates(locationCoordinates) ) {
-        await cleanupFiles(avatarLocalPath, coverImageLocalPath)
-        throw new ApiError(400, "Location coordinates must be an array of [lng, lat]");
+    if (locationCoordinates) {
+        if (!Array.isArray(locationCoordinates) || locationCoordinates.length !== 2) {
+            await cleanupFiles(avatarLocalPath, coverImageLocalPath)
+            throw new ApiError(400, "Location coordinates must be an array of [lng, lat]");
+        }
+        locationCoordinates = locationCoordinates.map(coord => Number(coord.trim()));
     }
     
     // validate email (regex, valid email)
@@ -136,7 +134,9 @@ const registerUser = asyncHandler(async (req, res) => {
         throw new ApiError(500, "Failed to create user in Database")
     }
 
-    return res.status(201).json(
+    return res
+    .status(201)
+    .json(
         new ApiResponse(201, createdUser.toObject(), "User Registered Successfully")
     )
 
