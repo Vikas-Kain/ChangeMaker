@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { changePassword, getCurrentUser, loginUser, logoutUser, refreshAccessToken, registerUser, updateUserDetails } from '../controllers/user.controller.js';
+import { changePassword, getCurrentUser, loginUser, logoutUser, refreshAccessToken, registerUser, updateUserAvatar, updateUserCoverImage, updateUserDetails } from '../controllers/user.controller.js';
 import { upload } from '../middlewares/multer.middleware.js';
 import { verifyJWT } from '../middlewares/auth.middleware.js';
 
@@ -20,12 +20,17 @@ router.route('/login').post(loginUser);
 
 router.route('/logout').post(verifyJWT, logoutUser);
 
-router.route('/refreshToken').post(refreshAccessToken);
+router.route('/refresh-token').post(refreshAccessToken);
 
-router.route('/changePassword').post(verifyJWT, changePassword);
+router.route('/change-password').post(verifyJWT, changePassword);
 
 router.route('/current-user').get(verifyJWT, getCurrentUser);
 
 router.route('/update-details').post(verifyJWT, updateUserDetails);
+
+router.route('/update-avatar').post(verifyJWT, upload.single("avatar"), updateUserAvatar);
+
+router.route('/update-cover-image').post(verifyJWT, upload.single("coverImage"), updateUserCoverImage);
+
 
 export default router;
