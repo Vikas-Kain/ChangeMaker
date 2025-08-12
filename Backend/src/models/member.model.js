@@ -1,6 +1,6 @@
 import mongoose, { Schema } from "mongoose";
 
-const projectMemberSchema = new Schema({
+const memberSchema = new Schema({
     project: {
         type: Schema.Types.ObjectId,
         ref: 'Project',
@@ -31,6 +31,6 @@ const projectMemberSchema = new Schema({
     }
 }, { timestamps: true });
 
-projectMemberSchema.index({ project: 1, member: 1 , role: 1, createdAt: -1 });
+memberSchema.index({ project: 1, member: 1 , role: 1, createdAt: -1 });
 
-export const ProjectMember = mongoose.model("ProjectMember", projectMemberSchema);
+export const Member = mongoose.model("Member", memberSchema);

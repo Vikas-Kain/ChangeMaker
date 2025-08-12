@@ -5,6 +5,7 @@ import { ApiResponse } from "../utils/apiResponse.js";
 import { uploadFileOnCloudinary } from "../utils/cloudinary.js";
 import { deleteFile } from "../utils/deleteFile.js";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 // import validator from "validator";
 
 
@@ -484,6 +485,95 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
         )
 });
 
+const userProfile = asyncHandler(async (req, res) => {
+    const username = req.params.username?.trim().toLowerCase();
+
+    if (!username) {
+        throw new ApiError(400, "Username is required");
+    }
+
+    const profile = await User.aggregate([
+        {
+            $match: {
+                username: username
+            }
+        },
+        {
+            $lookup: {
+                from: "projects",
+                localField: "_id",
+                foreignField: "owner",
+                as: "ownProjects"
+            }
+        },
+        {
+            $lookup: {
+                from: "posts",
+                localField: "_id",
+                foreignField: "author",
+                as: "userPosts"
+            }
+        },
+        {
+            $lookup: {
+                from: "members",
+                localField: "_id",
+                foreignField: "member",
+                as: "joinedProjects"
+            }
+        },
+        {
+            $lookup: {
+                from: "follows",
+                localField: "_id",
+                foreignField: "following",
+                as: "followers"
+            }
+        },
+        {
+            $lookup: {
+                from: "follows",
+                localField: "_id",
+                foreignField: "follower",
+                as: "following"
+            }
+        },
+        {
+            $addFields: {
+                followersCount: { $size: "$followers" },
+                followingCount: { $size: "$following" },
+                isFollowing: {
+                    $cond :{
+                        if: { $in: [req.user._id, "$followers.follower"] },
+                        then: true,
+                        else: false
+                    }
+                }
+            }
+        },
+        {
+            $project: {
+                password: 0,
+                refreshToken: 0,
+                __v: 0,
+                followers: 0,
+                following: 0
+            }
+        }
+    ]);
+
+    if ( !profile?.length ) {
+        throw new ApiError(404, "User not found");
+    }
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(200, profile[0], "User profile fetched successfully")
+        );
+});
+
 export {
-    registerUser, loginUser, logoutUser, refreshAccessToken, changePassword, getCurrentUser, updateUserDetails, updateUserAvatar, updateUserCoverImage
+    registerUser, loginUser, logoutUser, refreshAccessToken, changePassword, getCurrentUser,
+    updateUserDetails, updateUserAvatar, updateUserCoverImage, userProfile
 }
