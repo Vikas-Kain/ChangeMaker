@@ -167,10 +167,14 @@ const loginUserService = async (userData) => {
     
         // generate access and refresh token
         const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user);
+
+        if ( !accessToken || !refreshToken ) {
+            throw new ApiError(500, "Failed to generate token while logging in")
+        }
     
         return { user, accessToken, refreshToken };
     } catch (error) {
-        throw new ApiError(error.statusCode || 500, error.message || "Failed to change password")
+        throw new ApiError(error.statusCode || 500, error.message || "Failed to login user")
     }
 }
 
@@ -190,7 +194,7 @@ const logoutUserService = async (userId) => {
             }
         );
     } catch (error) {
-        throw new ApiError(error.statusCode || 500, error.message || "Failed to change password")
+        throw new ApiError(error.statusCode || 500, error.message || "Failed to logout user")
     }
 }
 
@@ -214,6 +218,10 @@ const refreshAccessTokenService = async (incomingRefreshToken) => {
         // generate new access token
         const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user);
 
+        if ( !accessToken || !refreshToken ) {
+            throw new ApiError(500, "Failed to refresh access token")
+        }
+
         return { user, accessToken, refreshToken };
 
     } catch (error) {
@@ -224,5 +232,48 @@ const refreshAccessTokenService = async (incomingRefreshToken) => {
     }
 }
 
+const changePasswordService = async (userId, reqBody) => {
+    try {
+        if (!userId) {
+            throw new ApiError(401, "Unauthorized: UserId required");
+        }
 
-export { registerUserService, loginUserService, logoutUserService, refreshAccessTokenService }
+        const { oldPassword, newPassword } = reqBody;
+
+        if (!oldPassword || !newPassword) {
+            throw new ApiError(400, "Old password and new password are required");
+        }
+
+        if (oldPassword === newPassword) {
+            throw new ApiError(400, "New password must be different from old password");
+        }
+
+        if (newPassword.length < 6) {
+            throw new ApiError(400, "New password must be at least 6 characters long");
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            throw new ApiError(404, "User not found");
+        }
+
+        const isOldPasswordCorrect = await user.comparePassword(oldPassword);
+        if (!isOldPasswordCorrect) {
+            throw new ApiError(401, "Old password is incorrect");
+        }
+
+        user.password = newPassword;
+        const updatedUser = await user.save();
+
+        if (!updatedUser) {
+            throw new ApiError(500, "Failed to change user password");
+        }
+
+        return updatedUser;
+    } catch (error) {
+        throw new ApiError(error.statusCode || 500, error.message || "Failed to change password")
+    }
+}
+
+
+export { registerUserService, loginUserService, logoutUserService, refreshAccessTokenService, changePasswordService }

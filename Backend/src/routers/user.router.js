@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import {
     changePassword, getCurrentUser, loginUser, logoutUser, refreshAccessToken, registerUser,
-    updateUserAvatar, updateUserCoverImage, updateUserDetails, getUserProfile, followUser, unfollowUser
+    updateUserAvatar, updateUserCoverImage, updateUserDetails, getUserProfile, followUser, unfollowUser,
+    getFollowers, getFollowings
 } from '../controllers/user.controller.js';
 import { upload } from '../middlewares/multer.middleware.js';
 import { verifyJWT } from '../middlewares/auth.middleware.js';
@@ -37,8 +38,12 @@ router.route('/update-cover-image').post(verifyJWT, upload.single("coverImage"),
 
 router.route('/profile/:username').get(verifyJWT, getUserProfile);
 
-router.route('/follow').post(verifyJWT, followUser);
+router.route('/follow/:username').post(verifyJWT, followUser);
 
-router.route('/unfollow').post(verifyJWT, unfollowUser);
+router.route('/unfollow/:username').post(verifyJWT, unfollowUser);
+
+router.route('/followers/:username').get(getFollowers);
+
+router.route('/followings/:username').get(getFollowings);
 
 export default router;

@@ -1,13 +1,10 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { User } from "../models/user.model.js";
-import { Follow } from "../models/follow.model.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { registerUserService, loginUserService, logoutUserService, refreshAccessTokenService } from "../services/auth.services.js";
-import { changePasswordService, getUserProfileService, updateUserDetailsService, updateUserImageService,
-    getUserProfileService, followUserService,
-    unfollowUserService
- } from  "../services/user.service.js"
+import {
+    getUserProfileService, updateUserDetailsService, updateUserImageService, followUserService,
+    unfollowUserService, getFollowersService, getFollowingsService
+} from "../services/user.service.js"
 
 
 const sanitizeUser = (user) => {
@@ -17,113 +14,6 @@ const sanitizeUser = (user) => {
     return sanitizedUser;
 }
 
-
-// register user
-const registerUser = asyncHandler(async (req, res) => {
-    const createdUser = await registerUserService(req.body, req.files);
-
-    if (!createdUser) {
-        throw new ApiError(500, "Failed to create user in Database")
-    }
-
-    return res
-        .status(201)
-        .json(
-            new ApiResponse(201, sanitizeUser(createdUser), "User Registered Successfully")
-        )
-
-});
-
-// login user
-const loginUser = asyncHandler(async (req, res) => {
-    const { user, accessToken, refreshToken } = await loginUserService(req.body);
-
-    if (!user || !accessToken || !refreshToken) {
-        throw new ApiError(500, "Failed to login user")
-    }
-    
-    const options = {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // set secure flag in production
-    }
-
-    return res
-        .status(200)
-        .cookie("accessToken", accessToken, options)
-        .cookie("refreshToken", refreshToken, options)
-        .json(
-            new ApiResponse(
-                200,
-                {
-                    user: sanitizeUser(user), accessToken, refreshToken
-                },
-                "User Logged In Successfully"
-            )
-        )
-});
-
-const logoutUser = asyncHandler(async (req, res) => {
-    await logoutUserService(req.user?._id);
-
-    const options = {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // set secure flag in production
-    }
-
-    return res
-        .status(200)
-        .clearCookie("accessToken", options)
-        .clearCookie("refreshToken", options)
-        .json(
-            new ApiResponse(200, {}, "User logged out successfully")
-        )
-});
-
-const refreshAccessToken = asyncHandler(async (req, res) => {
-    const incomingRefreshToken = req.cookies?.refreshToken || req.header("Authorization")?.replace("Bearer ", "");
-
-    const { user, accessToken, refreshToken } = await refreshAccessTokenService(incomingRefreshToken);
-
-    if (!user || !accessToken || !refreshToken ) {
-        throw new ApiError(500, "Failed to refresh access token")
-    }
-
-    const options = {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production', // set secure flag in production
-    }
-
-    return res
-            .status(200)
-            .cookie("accessToken", accessToken, options)
-            .cookie("refreshToken", refreshToken, options)
-            .json(
-                new ApiResponse(
-                    200,
-                    {
-                        user: sanitizeUser(user), accessToken, refreshToken
-                    },
-                    "Access token refreshed successfully")
-            );
-});
-
-const changePassword = asyncHandler(async (req, res) => {
-    const updatedUser = await changePasswordService(req.user?._id, req.body);
-
-    if (!updatedUser) {
-        throw new ApiError(error.statusCode || 500, error.message || "Failed to change password")
-    }
-    
-    return res
-        .status(200)
-        .json(
-            new ApiResponse(200,
-                {
-                    user: sanitizeUser(updatedUser)
-                },
-                "Password changed successfully")
-        );
-});
 
 const getCurrentUser = asyncHandler(async (req, res) => {
     return res
@@ -140,7 +30,7 @@ const getCurrentUser = asyncHandler(async (req, res) => {
 
 const updateUserDetails = asyncHandler(async (req, res) => {
     const updatedUser = await updateUserDetailsService(req.user?._id, req.body);
-    
+
     if (!updatedUser) {
         throw new ApiError(error.statusCode || 500, error.message || "Failed to update user details");
     }
@@ -160,7 +50,7 @@ const updateUserDetails = asyncHandler(async (req, res) => {
 const updateUserAvatar = asyncHandler(async (req, res) => {
     const updatedUser = await updateUserImageService(req.user?._id, req.file?.path, "avatar");
 
-    if ( !updatedUser ) {
+    if (!updatedUser) {
         throw new ApiError(error.statusCode || 500, error.message || "Failed to update user avatar");
     }
 
@@ -177,7 +67,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
 const updateUserCoverImage = asyncHandler(async (req, res) => {
     const updatedUser = await updateUserImageService(req.user?._id, req.file?.path, "coverImage");
 
-    if ( !updatedUser ) {
+    if (!updatedUser) {
         throw new ApiError(error.statusCode || 500, error.message || "Failed to update user coverImage");
     }
 
@@ -192,9 +82,8 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
 });
 
 const getUserProfile = asyncHandler(async (req, res) => {
-    const username = req.params.username?.trim().toLowerCase();
 
-    const profile = await getUserProfileService(username);
+    const profile = await getUserProfileService(req.user?._id, req.params?.username);
 
     if (!profile) {
         throw new ApiError(404, "User not found");
@@ -208,11 +97,8 @@ const getUserProfile = asyncHandler(async (req, res) => {
 });
 
 const followUser = asyncHandler(async (req, res) => {
-    // Get the user ID to follow from request body or params
-    const userToFollowId = req.body.userId || req.params.userId;
-    const currentUserId = req.user?._id;
-    
-    const follow = followUserService(userToFollowId, currentUserId);
+
+    const follow = followUserService(req.user?._id, req.params?.username);
 
     if (!follow) {
         throw new ApiError(500, "Failed to create follow relationship");
@@ -222,21 +108,19 @@ const followUser = asyncHandler(async (req, res) => {
         .status(200)
         .json(
             new ApiResponse(
-                200, 
+                200,
                 {
                     followId: follow._id,
-                    follower: currentUserId,
-                    following: userToFollowId
-            },
-            "User followed successfully")
+                    follower: follow.follower,
+                    following: follow.following
+                },
+                "User followed successfully")
         );
 });
 
 const unfollowUser = asyncHandler(async (req, res) => {
-    const userToUnfollowId = req.body.userId;
-    const currentUserId = req.user?._id;
 
-    await unfollowUserService(userToUnfollowId, currentUserId);
+    await unfollowUserService(req.user?._id, req.params?.username);
 
     return res
         .status(200)
@@ -245,8 +129,44 @@ const unfollowUser = asyncHandler(async (req, res) => {
         );
 });
 
+const getFollowers = asyncHandler(async (req, res) => {
+
+    const followers = await getFollowersService(req.params?.username);
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                {
+                    followers: followers,
+                    count: followers.length
+                },
+                "Followers fetched successfully"
+            )
+        );
+});
+
+const getFollowings = asyncHandler(async (req, res) => {
+
+    const following = await getFollowingsService(req.params?.username);
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                {
+                    following: following,
+                    count: following.length
+                },
+                "Following fetched successfully"
+            )
+        );
+});
+
 
 export {
-    registerUser, loginUser, logoutUser, refreshAccessToken, changePassword, getCurrentUser,
-    updateUserDetails, updateUserAvatar, updateUserCoverImage, getUserProfile, followUser, unfollowUser
+    getCurrentUser, updateUserDetails, updateUserAvatar, updateUserCoverImage, getUserProfile,
+    followUser, unfollowUser, getFollowers, getFollowings
 }
