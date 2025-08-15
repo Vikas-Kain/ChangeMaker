@@ -1,4 +1,4 @@
-import { ApiError } from "./ApiError";
+import { ApiError } from "./ApiError.js";
 import EmailValidationAPI from "email-address-validation"
 
 const validateInterests = (interestArray) => {

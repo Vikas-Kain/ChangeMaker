@@ -1,7 +1,9 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { registerUserService, loginUserService, logoutUserService, refreshAccessTokenService } from "../services/auth.services.js";
+import { 
+    registerUserService, loginUserService, logoutUserService, refreshAccessTokenService, changePasswordService
+} from "../services/auth.services.js";
 
 
 

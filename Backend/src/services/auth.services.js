@@ -3,7 +3,7 @@ import { uploadFileOnCloudinary } from "../utils/cloudinary.js";
 import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
 import jwt from "jsonwebtoken";
-import { validateInterests, validateLocationCoordinates, validateEmail } from "../utils/validateField.js";
+import { validateInterests, validateLocationCoordinates, validateEmail, validateUsername } from "../utils/validateField.js";
 
 
 const cleanupFiles = async (...filePaths) => {
@@ -156,8 +156,8 @@ const loginUserService = async (userData) => {
 
         // check if userId is email or username
         // const isEmail = validator.isEmail(userId.trim());
-        const isEmail = emailRegex.test(userId.trim());
-        const query = isEmail ? { email: userId.trim() } : { username: userId.trim().toLowerCase() };
+        const isUsername = validateUsername(userId.trim());
+        const query = isUsername ? { username: userId.trim().toLowerCase() } : { email: userId.trim() };
 
         // check if user exists in DB
         const user = await User.findOne(query);

@@ -1,4 +1,4 @@
-import { ApiError } from "../utils/ApiError";
+import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.model.js";
 import { Follow } from "../models/follow.model.js"
 import { uploadFileOnCloudinary } from "../utils/cloudinary.js";
@@ -10,9 +10,6 @@ const updateUserDetailsService = async (userId, reqBody) => {
     try {
         if (!userId) {
             throw new ApiError(401, "Unauthorized: User not found");
-        }
-        if (userId != reqBody._id) {
-            throw new ApiError(401, "Unauthorized: User not authorized to update someone else's details");
         }
 
         const fullname = reqBody.fullname?.trim() || "";
@@ -109,7 +106,20 @@ const getUserProfileService = async (currentUserId, username) => {
                     from: "projects",
                     localField: "_id",
                     foreignField: "owner",
-                    as: "ownProjects"
+                    as: "ownProjects",
+                    pipeline: [{
+                        $project: {
+                            _id: 1,
+                            title: 1,
+                            coverImage: 1,
+                            owner: 1,
+                            tags: 1,
+                            location: 1,
+                            status: 1,
+                            endDate: 1,
+                            createdAt: 1,
+                        }
+                    }]
                 }
             },
             {
@@ -117,7 +127,26 @@ const getUserProfileService = async (currentUserId, username) => {
                     from: "posts",
                     localField: "_id",
                     foreignField: "author",
-                    as: "userPosts"
+                    as: "userPosts",
+                    pipeline: [{
+                        $lookup: {
+                            from: "projects",
+                            localField: "linkedProject",
+                            foreignField: "_id",
+                            as: "linkedProjectDetails"
+                        }
+                    }, {
+                        $project: {
+                            _id: 1,
+                            title: 1,
+                            content: 1,
+                            author: 1,
+                            mediaFiles: 1,
+                            linkedProjectDetails: {
+                                $arrayElemAt: ["$linkedProjectDetails", 0]
+                            }
+                        }
+                    }]
                 }
             },
             {
@@ -125,7 +154,22 @@ const getUserProfileService = async (currentUserId, username) => {
                     from: "members",
                     localField: "_id",
                     foreignField: "member",
-                    as: "joinedProjects"
+                    as: "joinedProjects",
+                    pipeline: [{
+                        $lookup: {
+                            from: "projects",
+                            localField: "project",
+                            foreignField: "_id",
+                            as: "projectDetails"
+                        }
+                    }, {
+                        $project: {
+                            _id: 1,
+                            projectDetails: {
+                                $arrayElemAt: ["$projectDetails", 0]
+                            }
+                        }
+                    }]
                 }
             },
             {
@@ -164,30 +208,45 @@ const getUserProfileService = async (currentUserId, username) => {
             },
             {
                 $project: {
-                    password: 0,
-                    refreshToken: 0,
-                    __v: 0,
-                    followers: 0,
-                    following: 0,
+                    _id: 1,
+                    username: 1,
+                    fullname: 1,
+                    email: 1,
+                    avatar: 1,
+                    coverImage: 1,
+                    bio: 1,
+                    interests: 1,
+                    location: 1,
+                    locationCoordinates: 1,
+                    isVerified: 1,
+                    trustScore: 1,
+                    impactScore: 1,
+                    ownProjects: 1,
+                    userPosts: 1,
+                    joinedProjects: 1,
+                    followersCount: 1,
+                    followingCount: 1,
                     isFollowing: {
                         $cond: {
                             if: { $eq: ["$_id", currentUserId] },
                             then: "$$REMOVE",
                             else: "$isFollowing"
                         }
-                    }
+                    },
+                    createdAt: 1,
+                    updatedAt: 1
                 }
             }
         ]);
 
         if (!profile?.length) {
-            throw new ApiError(500, `User with username : ${username} could not be found`)
+            throw new ApiError(404, `User with username : ${username} could not be found`)
         }
 
         return profile[0]
     }
     catch (error) {
-        throw new ApiError(500, `Couldn't fetch user with username : ${username}`)
+        throw new ApiError(error.statusCode || 500, error.message || `Couldn't fetch user with username : ${username}`)
     }
 }
 
@@ -201,7 +260,7 @@ const followUserService = async (currentUserId, userToFollowName) => {
         }
 
         // Check if user to follow exists
-        const userToFollow = await User.find({ username: userToFollowName });
+        const userToFollow = await User.findOne({ username: userToFollowName });
         if (!userToFollow) {
             throw new ApiError(404, "User to follow not found");
         }
@@ -247,7 +306,7 @@ const unfollowUserService = async (currentUserId, userToUnfollowName) => {
         }
 
         // Check if user to unfollow exists
-        const userToUnfollow = await User.find({ username: userToUnfollowName });
+        const userToUnfollow = await User.findOne({ username: userToUnfollowName });
         if (!userToUnfollow) {
             throw new ApiError(404, "User to unfollow not found");
         }
@@ -293,7 +352,7 @@ const getFollowersService = async (username) => {
         }
 
         // Validate that the user exists
-        const user = await User.find({ username });
+        const user = await User.findOne({ username });
         if (!user) {
             throw new ApiError(404, "User not found");
         }
@@ -347,7 +406,7 @@ const getFollowingsService = async (username) => {
         }
 
         // Validate that the user exists
-        const user = await User.find({ username });
+        const user = await User.findOne({ username });
         if (!user) {
             throw new ApiError(404, "User not found");
         }
@@ -471,11 +530,11 @@ const searchUserService = async (searchTerm, currentUserId = null) => {
                 }
             },
             {
-                $sort: [
-                    { matchType: 1 }, // Username matches first
-                    { followersCount: -1 }, // Then by follower count
-                    { fullname: 1 } // Then alphabetically by fullname
-                ]
+                $sort: {
+                    matchType: 1, // Username matches first
+                    followersCount: -1, // Then by follower count
+                    fullname: 1 // Then alphabetically by fullname
+                }
             }
         ]);
 
