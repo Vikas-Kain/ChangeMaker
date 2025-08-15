@@ -1,4 +1,5 @@
 import { ApiError } from "./ApiError";
+import EmailValidationAPI from "email-address-validation"
 
 const validateInterests = (interestArray) => {
     const validInterests = ['environment', 'education', 'health', 'community', 'technology', 'other'];
@@ -20,4 +21,36 @@ const validateLocationCoordinates = (locationCoordinates) => {
     return locationCoordinates;
 }
 
-export { validateInterests, validateLocationCoordinates }
+const validateUsername = (username) => {
+    if (!username || typeof username !== 'string') {
+        throw new Error('Username must be a non-empty string');
+    }
+
+    const trimmedUsername = username.trim().toLowerCase();
+
+    if (trimmedUsername.length < 3 || trimmedUsername.length > 39) {
+        throw new Error('Username must be between 3 and 39 characters long');
+    }
+
+    // GitHub-style username regex: 3-39 characters, alphanumeric and hyphens only, no consecutive hyphens, no leading/trailing hyphens
+    const usernameRegex = /^(?!-)[a-z0-9-]{3,39}(?<!-)$/;
+
+    if (!usernameRegex.test(trimmedUsername)) {
+        throw new Error('Username must contain only lowercase letters, numbers, and hyphens. Cannot start or end with a hyphen, and cannot contain consecutive hyphens.');
+    }
+
+    return trimmedUsername;
+};
+
+const emailValidationApi = new EmailValidationAPI({ access_key: process.env.MAILBOXLAYER_API_KEY });
+const validateEmail = async (email) => {
+    try {
+        const result = await emailValidationApi.check(email);
+        return result;
+    } catch (err) {
+        console.error("Email validation error:", err);
+        throw new ApiError(500, "Could not validate email");
+    }
+}
+
+export { validateInterests, validateLocationCoordinates, validateUsername, validateEmail }

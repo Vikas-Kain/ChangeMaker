@@ -3,7 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import {
     getUserProfileService, updateUserDetailsService, updateUserImageService, followUserService,
-    unfollowUserService, getFollowersService, getFollowingsService
+    unfollowUserService, getFollowersService, getFollowingsService, searchUserService
 } from "../services/user.service.js"
 
 
@@ -165,8 +165,25 @@ const getFollowings = asyncHandler(async (req, res) => {
         );
 });
 
+const searchUsers = asyncHandler(async (req, res) => {
+    const searchTerm = req.params.name;
+    const currentUserId = req.user?._id;
+
+    const searchResults = await searchUserService(searchTerm, currentUserId);
+
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                searchResults,
+                "Users searched successfully"
+            )
+        );
+});
+
 
 export {
     getCurrentUser, updateUserDetails, updateUserAvatar, updateUserCoverImage, getUserProfile,
-    followUser, unfollowUser, getFollowers, getFollowings
+    followUser, unfollowUser, getFollowers, getFollowings, searchUsers
 }

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import {
     changePassword, getCurrentUser, loginUser, logoutUser, refreshAccessToken, registerUser,
     updateUserAvatar, updateUserCoverImage, updateUserDetails, getUserProfile, followUser, unfollowUser,
-    getFollowers, getFollowings
+    getFollowers, getFollowings, searchUsers
 } from '../controllers/user.controller.js';
 import { upload } from '../middlewares/multer.middleware.js';
 import { verifyJWT } from '../middlewares/auth.middleware.js';
@@ -45,5 +45,7 @@ router.route('/unfollow/:username').post(verifyJWT, unfollowUser);
 router.route('/followers/:username').get(getFollowers);
 
 router.route('/followings/:username').get(getFollowings);
+
+router.route('/search/name').get(verifyJWT, searchUsers);
 
 export default router;

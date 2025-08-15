@@ -11,7 +11,7 @@ const updateUserDetailsService = async (userId, reqBody) => {
         if (!userId) {
             throw new ApiError(401, "Unauthorized: User not found");
         }
-        if ( userId != reqBody._id ) {
+        if (userId != reqBody._id) {
             throw new ApiError(401, "Unauthorized: User not authorized to update someone else's details");
         }
 
@@ -150,7 +150,12 @@ const getUserProfileService = async (currentUserId, username) => {
                     followingCount: { $size: "$following" },
                     isFollowing: {
                         $cond: {
-                            if: { $in: [currentUserId, "$followers.follower"] },
+                            if: {
+                                $and: [
+                                    { $ne: ["$_id", currentUserId] },
+                                    { $in: [currentUserId, "$followers.follower"] }
+                                ]
+                            },
                             then: true,
                             else: false
                         }
@@ -163,7 +168,14 @@ const getUserProfileService = async (currentUserId, username) => {
                     refreshToken: 0,
                     __v: 0,
                     followers: 0,
-                    following: 0
+                    following: 0,
+                    isFollowing: {
+                        $cond: {
+                            if: { $eq: ["$_id", currentUserId] },
+                            then: "$$REMOVE",
+                            else: "$isFollowing"
+                        }
+                    }
                 }
             }
         ]);
@@ -383,8 +395,115 @@ const getFollowingsService = async (username) => {
     }
 }
 
+const searchUserService = async (searchTerm, currentUserId = null) => {
+    try {
+        if (!searchTerm || searchTerm.trim().length === 0) {
+            throw new ApiError(400, "Search term is required");
+        }
+
+        const searchQuery = searchTerm.trim().toLowerCase();
+
+        // Search for users by username (exact match) and fullname (partial match)
+        const searchResults = await User.aggregate([
+            {
+                $match: {
+                    $or: [
+                        { username: searchQuery }, // Exact username match
+                        { fullname: { $regex: searchQuery, $options: 'i' } } // Case-insensitive fullname search
+                    ]
+                }
+            },
+            {
+                $lookup: {
+                    from: "follows",
+                    localField: "_id",
+                    foreignField: "following",
+                    as: "followers"
+                }
+            },
+            {
+                $lookup: {
+                    from: "follows",
+                    localField: "_id",
+                    foreignField: "follower",
+                    as: "followings"
+                }
+            },
+            {
+                $addFields: {
+                    followersCount: { $size: "$followers" },
+                    followingCount: { $size: "$followings" },
+                    isFollowing: currentUserId ? {
+                        $cond: {
+                            if: {
+                                $and: [
+                                    { $ne: ["$_id", currentUserId] },
+                                    { $in: [currentUserId, "$followers.follower"] }
+                                ]
+                            },
+                            then: true,
+                            else: false
+                        }
+                    } : false,
+                    matchType: {
+                        $cond: {
+                            if: { $eq: ["$username", searchQuery] },
+                            then: "username",
+                            else: "fullname"
+                        }
+                    }
+                }
+            },
+            {
+                $project: {
+                    password: 0,
+                    refreshToken: 0,
+                    __v: 0,
+                    followers: 0,
+                    following: 0,
+                    isFollowing: {
+                        $cond: {
+                            if: { $eq: ["$_id", currentUserId] },
+                            then: "$$REMOVE",
+                            else: "$isFollowing"
+                        }
+                    }
+                }
+            },
+            {
+                $sort: [
+                    { matchType: 1 }, // Username matches first
+                    { followersCount: -1 }, // Then by follower count
+                    { fullname: 1 } // Then alphabetically by fullname
+                ]
+            }
+        ]);
+
+        // Separate results by match type
+        const usernameMatches = searchResults.filter(user => user.matchType === "username");
+        const fullnameMatches = searchResults.filter(user => user.matchType === "fullname");
+
+        // Remove matchType from final response
+        const cleanResults = searchResults.map(user => {
+            const { matchType, ...cleanUser } = user;
+            return cleanUser;
+        });
+
+        return {
+            searchTerm: searchQuery,
+            totalResults: searchResults.length,
+            usernameMatches: usernameMatches.length,
+            fullnameMatches: fullnameMatches.length,
+            results: cleanResults
+        };
+
+    } catch (error) {
+        throw new ApiError(error.statusCode || 500, error.message || "Failed to search users");
+    }
+}
+
 
 export {
     updateUserDetailsService, updateUserImageService, getUserProfileService, followUserService,
-    unfollowUserService, getFollowersService, getFollowingsService
+    unfollowUserService, getFollowersService, getFollowingsService, searchUserService
 }

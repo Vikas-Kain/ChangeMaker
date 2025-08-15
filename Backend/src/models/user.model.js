@@ -2,7 +2,7 @@ import mongoose, { Schema } from "mongoose";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
-const userSchema = new mongoose.Schema({
+const userSchema = new Schema({
     username: {
         type: String,
         required: true,
@@ -10,6 +10,15 @@ const userSchema = new mongoose.Schema({
         lowercase: true,
         trim: true,
         minlength: 3,
+        maxlength: 39,
+        validate: {
+            validator: function (value) {
+                // GitHub-style username regex: 3-39 characters, alphanumeric and hyphens only, no consecutive hyphens, no leading/trailing hyphens
+                const usernameRegex = /^(?!-)[a-z0-9-]{3,39}(?<!-)$/;
+                return usernameRegex.test(value);
+            },
+            message: 'Username must be 3-39 characters long, contain only lowercase letters, numbers, and hyphens. Cannot start or end with a hyphen, and cannot contain consecutive hyphens.'
+        }
     },
     email: {
         type: String,
